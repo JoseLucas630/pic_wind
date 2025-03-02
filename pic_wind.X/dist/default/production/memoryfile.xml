@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <executable name="dist/default/production\pic_wind.X.production.hex">
+    <memory name="program">
+      <units>bytes</units>
+      <length>16384</length>
+      <used>458</used>
+      <free>15926</free>
+    </memory>
+    <memory name="data">
+      <units>bytes</units>
+      <length>768</length>
+      <used>18</used>
+      <free>750</free>
+    </memory>
+  </executable>
+</project>
