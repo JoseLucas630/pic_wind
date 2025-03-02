@@ -82,27 +82,46 @@ unsigned char RH, TEMP;
 
 void start_DHT11(void)
 {
+    /*
+     *  this is the starting point. According to dht11 datasheet, you first need to
+     * send a low voltage for 18ms, and the pull up it for 40us.
+     * TRISB is the data direction register for the IO pins. TRISB is the data
+     * direction register of PORTB. by setting PIN B 3 as a 0, it's set as output.
+     */
     TRISBbits.TRISB3 = 0;
     
-    LATBbits.LATB3 = 0;        //PORTBbits.RB3 = 0;
+    LATBbits.LATB3 = 0;        //now, write low for 18ms
     __delay_ms(18);
-    LATBbits.LATB3 = 1;       //PORTBbits.RB3 = 1;
-    __delay_us(40);
-    TRISBbits.TRISB3 = 1;
+    LATBbits.LATB3 = 1;       //pull up
+    __delay_us(40);           //for about 40us(microseconds)
+    TRISBbits.TRISB3 = 1;     //set it as a input, because it will now receive signal
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 void check_DHT11(void)
 {
-    check = 0;
+    /*
+     * now the part that checks if the sensor has answered us.
+     * "Once DHT detects the start signal, it will send out a low-voltage-level response signal, which
+     * lasts 80us. Then the programme of DHT sets Data Single-bus voltage level from low to high and
+     * keeps it for 80us for DHT?s preparation for sending data."
+     * This is the datasheet. 
+     * this code checks if the input is low, if it is, delay it for 80us.
+     * after the delay, the pin will again the check the input, but this time to
+     * find if it's high, it it is, the program delay again for 80us and change
+     * "check" to 1.
+     */
+    check = 0;   //just to check :p
     
     __delay_us(40);
-    if(PORTBbits.RB3 == 0) 
+    if(PORTBbits.RB3 == 0) //detect if the port is receiving a low signal
     { 
+        //if it is, delay and wait for the high voltage
         __delay_us(80);
-        if(PORTBbits.RB3 == 1)
+        if(PORTBbits.RB3 == 1)  //check for high voltage
         {
+            //high voltage checked. delay it.
             check = 1;
             __delay_us(80);
         }
@@ -113,12 +132,28 @@ void check_DHT11(void)
 
 char read_dht11(void)
 {
+    /*
+     * Well, this code is not mine. i just copied and pasted it from a tutorial.
+     * It measures the time of the signal.
+     * according to datasheet:
+     * 50us low and then 70us high: 1
+     * 50us low and then 28-29us high: 0
+     * by this, the code implements a function to measure the lenght of signal
+     * and return data with it value
+     */
     char data = 0, for_count;
  
     for(for_count = 0; for_count < 8; for_count++)
     {
-        while(!PORTBbits.RB3); 
+        //this function here is the key. it waits for the signal to go high and start reading
+        while(!PORTBbits.RB3);
        __delay_us(30);
+       /*
+        * it waits 30us for a parameter.
+        * if 30us passed, it reads the port;
+        * if the port is low, the data is write as 0
+        * if the port is still high, data is write as 1
+       */
        if(PORTBbits.RB3 == 0)
        {
            data&= ~(1<<(7 - for_count)); //Clear bit (7-b)
@@ -127,28 +162,35 @@ char read_dht11(void)
        {
            data|= (1 << (7 - for_count)); //Set bit (7-b)
            while(PORTBbits.RB3);
-       } //Wait until PORTD.F0 goes LOW
+       } //Wait until PORTB3
     }
-    return data;
+    return data;   //return the data in a char
  }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 void main(void)
 {
-    ADCON0 = 0x00; //Turns the ADC off
+    ADCON0 = 0x00; //Turns the ADC off because i won't be needed
     
-    TRISBbits.TRISB4 = 0;
-    TRISBbits.TRISB0 = 0;
+    TRISBbits.TRISB4 = 0;  //my relay port set as output
+    int temp1;            //variable for storing the temperature
     
-    int temp1;
-    
-    while(1)
+    while(1) //infinite
     {
-        start_DHT11();
-        check_DHT11();
-        if(check == 1)
+        start_DHT11();   //start dht11
+        check_DHT11();   //check dht11
+        if(check == 1)    //if check = 1, it means the process gone right
         {
+            /*
+             * "Data consists of decimal and integral parts. A complete data transmission is 40bit, and the
+             * sensor sends higher data bit first.
+             * Data format: 8bit integral RH data + 8bit decimal RH data + 8bit integral T data + 8bit decimal T
+             * data + 8bit check sum. If the data transmission is right, the check-sum should be the last 8bit of
+             * "8bit integral RH data + 8bit decimal RH data + 8bit integral T data + 8bit decimal T data"."
+             * 
+             * each read is associated as of one of the chars
+             */
             rh_byte1 = read_dht11();
             rh_byte2 = read_dht11();
             t_byte1 = read_dht11();
@@ -157,23 +199,34 @@ void main(void)
             
             if(sum == ((rh_byte1 + rh_byte2 + t_byte1 + t_byte2)))
              {
-                TEMP = t_byte1;//temp = (int*)malloc(t_byte1 * sizeof(int));
-                RH = rh_byte1;//rh = (int*)malloc(rh_byte1 * sizeof(int));
+                /*
+                 * the sum needs to be literally the sum of all number
+                 */
+                TEMP = t_byte1; 
+                RH = rh_byte1;
              }
             
-            PORTBbits.RB0 = 0;
-            temp1 = (int)TEMP;
+            /*
+             * now, just cast the char to a int and the temperature is read to be used!
+             * this variable is probably useless. I could just used RH as a int and 
+             * use it...
+             */
+            temp1 = (int)TEMP; 
         }
-        
+       
+        /*
+         * as the final thing, the program sees if the temperature is higher than 28
+         * degrees celsius. if it is, turn on the fan!
+         */
         if (temp1 >= 28)
         {
-            PORTBbits.RB4 = 1; // Liga o relé
+            PORTBbits.RB4 = 1; //relay
         }
         else
         {
-            PORTBbits.RB4 = 0; // Desliga o relé
+            PORTBbits.RB4 = 0; //not today
         }
 
-        __delay_ms(1000);
+        __delay_ms(1000);   //wait a second for another read.
     }
 }
