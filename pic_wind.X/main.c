@@ -133,7 +133,6 @@ void check_DHT11(void)
 char read_dht11(void)
 {
     /*
-     * Well, this code is not mine. i just copied and pasted it from a tutorial.
      * It measures the time of the signal.
      * according to datasheet:
      * 50us low and then 70us high: 1
